@@ -4,14 +4,17 @@ import numpy as np
 from folktables import ACSDataSource, ACSIncome, ACSEmployment, ACSPublicCoverage
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.preprocessing import StandardScaler
 from copy import deepcopy
 import acs
 import utils as ut
+from pathlib import Path
 
 import pickle
 import fasttext
 from tqdm import tqdm
 
+DATA_DIR = Path('../data/')
 class Dataset:
     def __init__(self, dataset_name: str, **kwargs) -> None:
         self.dataset_name = dataset_name
@@ -38,7 +41,8 @@ class Dataset:
             'employment': self.preprocess_acs,
             'bank': self.preprocess_bank,
             'lawschool': self.preprocess_lawschool,
-            'biasbios': self.preprocess_biasbios
+            'biasbios': self.preprocess_biasbios,
+            'nels': self.preprocess_nels,
         }
 
         if dataset_name not in preprocessing_methods:
@@ -46,11 +50,7 @@ class Dataset:
 
         if dataset_name in ['income', 'coverage', 'employment']:
             return preprocessing_methods[dataset_name](dataset_name, **kwargs)
-        elif dataset_name == 'bank':
-            return preprocessing_methods[dataset_name](**kwargs)
-        elif dataset_name == 'lawschool':
-            return preprocessing_methods[dataset_name](**kwargs)
-        elif dataset_name == 'biasbios':
+        else:
             return preprocessing_methods[dataset_name](**kwargs)
 
     def get_cov_yg(self, sensitive_ind=0):
@@ -68,7 +68,6 @@ class Dataset:
                                 'feature': self.x_labels[i]})
         plot_df = pd.DataFrame(results)
         return plot_df
-
 
     def preprocess_biasbios(self, target_occ:str ='professor', rep:str='WE', balanced=False):
         '''
@@ -122,6 +121,7 @@ class Dataset:
                         vec = ft.get_word_vector(t)
                     else:
                         vec += ft.get_word_vector(t)
+                # Vectorize gender 1 is Female = 0 and Male = 1
                 if row['gender'] == 'F':
                     g_occ.append(0)
                 else:
@@ -136,18 +136,71 @@ class Dataset:
             y_all = balanced_bios['occupation'].map(self.class_map).tolist()
             # Vectorized occupation comparison 1 for target occ else 0
             y_occ = (balanced_bios['occupation'] == target_occ).tolist()
-            # Vectorize gender 1 is M 0 is Female
-            g_occ = np.where(balanced_bios['gender'] == 'M', 0, 1).tolist()
+            # Vectorize gender 1 is Female = 0 and Male = 1
+            g_occ = np.where(balanced_bios['gender'] == 'F', 0, 1).tolist()
             # extract text starting from start poss
             x_occ = balanced_bios.apply(lambda row: row['bio'][row['start_pos']:], axis=1).tolist()
             self.x_raw = x_occ
-            vectorizer = CountVectorizer(analyzer='word', stop_words='english', max_features=5000)
+            self.vectorizer = CountVectorizer(analyzer='word', stop_words='english', max_features=5000)
 
-            x_occ = vectorizer.fit_transform(x_occ)
+            x_occ = self.vectorizer.fit_transform(x_occ).toarray()
         else:
             raise ValueError("Must select BOW or Word Embeddings as representation")
 
         return x_occ, np.asarray(y_all), np.asarray(g_occ)
+
+    def preprocess_nels(self, normalize:bool=True, condensed_features:bool=False):
+        df = pd.read_csv(DATA_DIR/"nels/bin_data_d828_n12144.csv")
+
+        df["F4HHDG"] = (df["F4HHDG"] >= 4.0).astype(int)
+
+        # standard features:
+        all_targets = [
+            "F4EGRD",
+            "F4BYPNFL",
+            "F4PNLFL",
+            "F4F1PNFL",
+            "F4F2PNFL",
+            "F4HSDIPL",
+            "F4HHDG",
+            "F4TYPEDG",
+            "F4ATT4YR",
+            "F4ATTPSE",
+            "F1QFLG",
+            "F2QFLG"
+        ]
+        print(f"total students {len(df)}")
+        print(f'Limiting entries to two racial groups 3 n={len(df[df["RACE"] == 3])} and 4 n={len(df[df["RACE"] == 4])}') # change this to argument
+
+        df = df[df["RACE"].isin([3, 4])]
+        print(f"remaining students {len(df)}")
+        y = df["F4HHDG"]
+        df.drop("F4HHDG", axis=1, inplace=True)
+        s = df['RACE'].map({3: 0, 4: 1}) # mapping while to 1 and black to 0
+        self.s_labels = ['RACE']
+        df.drop('RACE', axis=1, inplace=True)
+        df.drop('RACE_3', axis=1, inplace=True)
+        df.drop('RACE_4', axis=1, inplace=True)
+        df.drop('RACE_5', axis=1, inplace=True)
+        df.drop('RACE_8', axis=1, inplace=True)
+        #print(df.keys())
+        # for key in condensed_keys:
+        #     if key in df.keys():
+        #         print("key found: ", key)
+        #     else:
+        #         print("key not in condensed_keys: ", key)
+        features = [f for f in df.keys() if f not in all_targets]
+        #print(features[0], len(features))
+        x = df[features]
+        self.x_labels = x.keys()
+
+        if normalize:
+            scaler = StandardScaler()
+            x_values = scaler.fit_transform(x.values)
+        else:
+            x_values = x.values
+
+        return x_values, y.values, s.values
 
     def preprocess_bank(self, remove_sensitive: bool = False):
         '''
@@ -287,5 +340,4 @@ class Dataset:
             self.y_all_test = deepcopy(self.y_test)
             self.y_train = np.where(self.y_train == self.class_map[self.tgt_class], 1, 0)
             self.y_test = np.where(self.y_test == self.class_map[self.tgt_class], 1, 0)
-        return 
-
+        return

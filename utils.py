@@ -26,37 +26,32 @@ def cov_corr_summary(y: np.array, p: np.array, g: np.array, pg: np.array):
     summary['corr(y, g)'], _ = stats.pearsonr(y, g)
     return summary
 
-def results_summary(clf: BaseEstimator,
-                    pg1: BaseEstimator,
-                    pg2: BaseEstimator,
+def results_summary(pg_dict: Dict["str", BaseEstimator],
+                    p: np.ndarray,
                     x: np.ndarray,
                     y: np.ndarray,
-                    g: np.ndarray,
-                    metric: str = 'DP') -> Dict:
+                    g: np.ndarray,) -> Dict:
     ''' return accuracy, acc, mertic, cov(p, g_1), cov(p, g_2) '''
     results = {}
-    p = clf.predict_proba(x)[:, 1]
     p_acc = accuracy_score(y_true=y, y_pred=p > 0.5)
-    pg1 = pg1.predict_proba(x)[:, 1]
-    pg2 = pg2.predict_proba(x)[:, 1]
     results['accuracy'] = p_acc
-
-    results['cov(p, pg1)'] = emp_cov(p, pg1)
-    results['cov(p, pg2)'] = emp_cov(p, pg2)
-
     mask = g == 1
     group1 = (p > 0.5)[mask].mean()
     group2 = (p > 0.5)[~mask].mean()
-    results['DP'] = np.abs(group1 - group2)
-
+    results['DP_G'] = np.abs(group1 - group2)
     mask_y = y == 1
-    results['cov(p, pg1 |y=1)'] = emp_cov(p[mask_y], pg1[mask_y])
-    results['cov(p, pg2 |y=1)'] = emp_cov(p[mask_y], pg2[mask_y])
     group1 = (p > 0.5)[(mask & mask_y)].mean()
     group2 = (p > 0.5)[(~mask & mask_y)].mean()
-    results['EO'] = np.abs(group1 - group2)
+    results['EO_G'] = np.abs(group1 - group2)
 
 
+    for key, pg in pg_dict.items(): 
+        pg_vals = pg.predict_proba(x)[:, 1]
+        # pg DP
+        results[f'cov(p, {key})'] = emp_cov(p, pg_vals)
+        # pg EO 
+        mask_y = y == 1
+        results[f'cov(p, {key} |y=1)'] = emp_cov(p[mask_y], pg_vals[mask_y])
     return results
 
 
