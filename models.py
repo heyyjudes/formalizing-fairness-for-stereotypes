@@ -25,6 +25,7 @@ from typing import List
 import utils as ut
 import skfuzzy as fuzz
 
+
 class HarmfulFeaturesClassifier:
     def __init__(self, base_clf: BaseEstimator, feature_ind: np.ndarray):
         self.clf = base_clf
