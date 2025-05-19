@@ -12,18 +12,18 @@ This repository contains the official code and experiments for our TMLR Paper [F
 
 ### Datasets
 We use two main datasets in our paper: 
-- `BiasBios`: 
-- `NELS`: 
+- `BiasBios`: We use code form the original [BiasBios](https://github.com/microsoft/biosbias) to scrape ~47k progessional biographies. 
+- `NELS`: [National Education Longitudinal Study](https://nces.ed.gov/surveys/nels88/) is a national study of 8th graders with follow up surveys until they reached high school. We include the processed data we used for our experiments in the data folder. 
 
 ### Code
 
 We provide two main Jupyter notebooks to reproduce all results from the paper:
 
 
-- [`Bios.ipynb`](Bios.ipynb): Reproduce our experiments on the BiosBias dataset, demonstrating real-world impact and mitigation.
-- [`NELS.ipynb`](NELS.ipynb): Reproduce our experiments on the National Education Longtitudinal Survey dataset, demonstrating impact in education.
+- [`Bios.ipynb`](Bios.ipynb): Reproduce our experiments on the BiosBias dataset three different race-based stereotypes. 
+- [`NELS.ipynb`](NELS.ipynb): Reproduce our experiments on the National Education Longtitudinal Survey dataset with three different gender based stereotypes. 
 
-These notebooks use our code in `models.py` which implement multicalibration algorithms. 
+These notebooks use our code in `models.py` which implement multicalibration algorithms and `data.py` which handles the data processing. 
 
 ### Requirements
 
