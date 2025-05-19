@@ -1,0 +1,2 @@
+data/bios/**/*.* filter=lfs diff=lfs merge=lfs -text
+data/nels/**/*.* filter=lfs diff=lfs merge=lfs -text
